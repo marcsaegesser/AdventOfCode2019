@@ -2,7 +2,7 @@ package advent
 
 object Day02 {
 
-  def day02(): Unit = {
+  def run(): Unit = {
     val memory = readFile(inputFile)
     println(s"Day02.part1 = ${part1(memory)}")
     println(s"Day02.part2 = ${part2(memory)}")

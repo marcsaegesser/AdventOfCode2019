@@ -2,7 +2,7 @@ package advent
 
 object Day01 {
 
-  def day01(): Unit = {
+  def run(): Unit = {
     val input = readFile(inputFile)
 
     println(s"Day01.part1 = ${part1(input)}")
