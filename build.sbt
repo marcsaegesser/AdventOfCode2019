@@ -1,6 +1,6 @@
-lazy val advent2016 = (project in file("."))
+lazy val advent2019 = (project in file("."))
   .settings (
-    name := "Advent2016",
+    name := "Advent2019",
     organization := "org.saegesser",
     version := "0.0.0-SNAPSHOT",
     scalaVersion in ThisBuild := "2.13.1",
