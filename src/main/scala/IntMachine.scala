@@ -5,8 +5,22 @@ import scala.math.Integral.Implicits._
 object IntMachine {
   case class Machine(ip: Int, state: State, memory: Vector[Int], input: List[Int],  output: List[Int])
 
+
+  def initializeMachine(memory: Vector[Int], n: Int, v: Int): Machine =
+    Machine(0, Running, memory.updated(1, n).updated(2, v), List.empty[Int], List.empty[Int])
+
+  def initializeMachine(memory: Vector[Int], input: List[Int]): Machine =
+    Machine(0, Running, memory, input, List.empty[Int])
+
+  def initializeMachine(s: String, input: List[Int]): Machine =
+    initializeMachine(parseMemory(s), input)
+
+  def loadMachine(f: String, input: List[Int]) =
+    initializeMachine(readMemory(f), input)
+
   sealed trait State
   case object Running extends State
+  case object Waiting extends State
   case object Halted  extends State
 
   type OpCode = Int
@@ -38,9 +52,20 @@ object IntMachine {
   def runMachine(m: Machine): Machine = {
     m.state match {
       case Halted  => m
+      case Waiting => m
       case Running => runMachine(step(m))
     }
   }
+
+  def provideInput(m: Machine, input: List[Int]): Machine =
+    m.state match {
+      case Halted  => m.copy(input = m.input ++ input)  // Still halted
+      case Waiting => m.copy(state=Running, input = m.input ++ input)
+      case Running => m.copy(input = m.input ++ input)
+    }
+
+  def takeOutput(m: Machine): (List[Int], Machine) =
+    (m.output.reverse, m.copy(output = List.empty[Int]))
 
   def step(machine: Machine): Machine = {
     machine match { case Machine(ip, state, m, i, o) if state == Running =>
@@ -116,10 +141,17 @@ object IntMachine {
   }
 
   def evalIN(i: Instruction, m: Machine): Machine = {
-    val in = m.input.head
-    val dest = m.memory(m.ip+1)  // Don't dereference pointer
+    m.input match {
+      case Nil    =>
+        m.copy(state=Waiting)
+      case h :: t =>
+        val dest = m.memory(m.ip+1)  // Don't dereference pointer
+        m.copy(memory=m.memory.updated(dest, h), input=t, ip=m.ip+2)
+    }
+    // val in = m.input.head
+    // val dest = m.memory(m.ip+1)  // Don't dereference pointer
 
-    m.copy(memory=m.memory.updated(dest, in), input=m.input.tail, ip=m.ip+2)
+    // m.copy(memory=m.memory.updated(dest, in), input=m.input.tail, ip=m.ip+2)
   }
 
   def evalOUT(i: Instruction, m: Machine): Machine = {
@@ -166,9 +198,18 @@ object IntMachine {
     m.copy(state = Halted)
   }
 
-  def initializeMachine(memory: Vector[Int], n: Int, v: Int): Machine =
-    Machine(0, Running, memory.updated(1, n).updated(2, v), List.empty[Int], List.empty[Int])
+  def readMemory(f: String): Vector[Int] =
+    io.Source.fromFile(f)
+      .getLines().flatten
+      .mkString
+      .split(",")
+      .toVector
+      .map(_.toInt)
 
-  def initializeMachine(memory: Vector[Int], input: List[Int]) =
-    Machine(0, Running, memory, input, List.empty[Int])
+  def parseMemory(s: String): Vector[Int] =
+    s.split(",")
+      .toVector
+      .map(_.toInt)
+
+
 }

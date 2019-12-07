@@ -11,7 +11,7 @@ object Day06 {
   def part1(tree: Tree[String]): Int = sumDepths(tree, 0)
 
   def part2(tree: Tree[String]): Int = {
-    val (l1, l2) = dropCommonPrefix(findPath(tree, "YOU").get.reverse, findPath(tree, "SAN").get.reverse)
+    val (l1, l2) = dropCommonPrefix(findPath(tree, "YOU").get, findPath(tree, "SAN").get)
     l1.size + l2.size
   }
 
@@ -23,9 +23,9 @@ object Day06 {
   def findPath(tree: Tree[String], target: String): Option[List[String]] = {
     def helper(path: List[String], trees: List[Tree[String]]): Option[List[String]] =
       trees match {
-        case Nil                        => None
-        case h :: t if h.value == target => Some(path)
-        case h :: t                     => helper(h.value +: path, h.children) orElse helper(path, t)
+        case Nil                         => None
+        case h :: t if h.value == target => Some(path.reverse)
+        case h :: t                      => helper(h.value +: path, h.children) orElse helper(path, t)
       }
 
     helper(List.empty[String], List(tree))
