@@ -3,19 +3,21 @@ package advent
 import scala.math.Integral.Implicits._
 
 object IntMachine {
-  case class Machine(ip: Int, state: State, memory: Vector[Int], input: List[Int],  output: List[Int])
+  type Memory = Map[Long, Long]
+
+  case class Machine(ip: Long, state: State, memory: Memory, relativeBase: Long, input: List[Long],  output: List[Long])
 
 
-  def initializeMachine(memory: Vector[Int], n: Int, v: Int): Machine =
-    Machine(0, Running, memory.updated(1, n).updated(2, v), List.empty[Int], List.empty[Int])
+  def initializeMachine(memory: Memory, n: Int, v: Int): Machine =
+    Machine(0, Running, memory.updated(1, n.toLong).updated(2, v.toLong), 0, List.empty[Long], List.empty[Long])
 
-  def initializeMachine(memory: Vector[Int], input: List[Int]): Machine =
-    Machine(0, Running, memory, input, List.empty[Int])
+  def initializeMachine(memory: Memory, input: List[Long]): Machine =
+    Machine(0, Running, memory, 0, input, List.empty[Long])
 
-  def initializeMachine(s: String, input: List[Int]): Machine =
+  def initializeMachine(s: String, input: List[Long]): Machine =
     initializeMachine(parseMemory(s), input)
 
-  def loadMachine(f: String, input: List[Int]) =
+  def loadMachine(f: String, input: List[Long]) =
     initializeMachine(readMemory(f), input)
 
   sealed trait State
@@ -32,22 +34,25 @@ object IntMachine {
   val JMP_FALSE = 6
   val LT        = 7
   val EQ        = 8
+  val SET_RB    = 9
   val HALT      = 99
 
   sealed trait ParameterMode
-  case object PositionMode extends ParameterMode
+  case object PositionMode  extends ParameterMode
   case object ImmediateMode extends ParameterMode
+  case object RelativeMode  extends ParameterMode
 
   sealed trait Instruction { val modes: Vector[ParameterMode] }
-  case class AddInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class MultInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class InInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class OutInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class JumpTrueInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class JumpFalseInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class LessThanInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class EqualsInstruction(modes: Vector[ParameterMode]) extends Instruction
-  case class HaltInstruction(modes: Vector[ParameterMode]) extends Instruction
+  case class AddInstruction(modes: Vector[ParameterMode])             extends Instruction
+  case class MultInstruction(modes: Vector[ParameterMode])            extends Instruction
+  case class InInstruction(modes: Vector[ParameterMode])              extends Instruction
+  case class OutInstruction(modes: Vector[ParameterMode])             extends Instruction
+  case class JumpTrueInstruction(modes: Vector[ParameterMode])        extends Instruction
+  case class JumpFalseInstruction(modes: Vector[ParameterMode])       extends Instruction
+  case class LessThanInstruction(modes: Vector[ParameterMode])        extends Instruction
+  case class EqualsInstruction(modes: Vector[ParameterMode])          extends Instruction
+  case class SetRelativeBaseInstruction(modes: Vector[ParameterMode]) extends Instruction
+  case class HaltInstruction(modes: Vector[ParameterMode])            extends Instruction
 
   def runMachine(m: Machine): Machine = {
     m.state match {
@@ -57,33 +62,34 @@ object IntMachine {
     }
   }
 
-  def provideInput(m: Machine, input: List[Int]): Machine =
+  def provideInput(m: Machine, input: List[Long]): Machine =
     m.state match {
       case Halted  => m.copy(input = m.input ++ input)  // Still halted
       case Waiting => m.copy(state=Running, input = m.input ++ input)
       case Running => m.copy(input = m.input ++ input)
     }
 
-  def takeOutput(m: Machine): (List[Int], Machine) =
-    (m.output.reverse, m.copy(output = List.empty[Int]))
+  def takeOutput(m: Machine): (List[Long], Machine) =
+    (m.output.reverse, m.copy(output = List.empty[Long]))
 
   def step(machine: Machine): Machine = {
-    machine match { case Machine(ip, state, m, i, o) if state == Running =>
+    machine match { case Machine(ip, state, m, b, i, o) if state == Running =>
       parseInstruction(ip, m) match {
-        case i@AddInstruction(pm)       => evalADD(i, machine)
-        case i@MultInstruction(pm)      => evalMULT(i, machine)
-        case i@InInstruction(pm)        => evalIN(i, machine)
-        case i@OutInstruction(pm)       => evalOUT(i, machine)
-        case i@JumpTrueInstruction(pm)  => evalJumpTrue(i, machine)
-        case i@JumpFalseInstruction(pm) => evalJumpFalse(i, machine)
-        case i@LessThanInstruction(pm)  => evalLessThan(i, machine)
-        case i@EqualsInstruction(pm)    => evalEquals(i, machine)
-        case i@HaltInstruction(pm)      => evalHALT(i, machine)
+        case i@AddInstruction(pm)             => evalADD(i, machine)
+        case i@MultInstruction(pm)            => evalMULT(i, machine)
+        case i@InInstruction(pm)              => evalIN(i, machine)
+        case i@OutInstruction(pm)             => evalOUT(i, machine)
+        case i@JumpTrueInstruction(pm)        => evalJumpTrue(i, machine)
+        case i@JumpFalseInstruction(pm)       => evalJumpFalse(i, machine)
+        case i@LessThanInstruction(pm)        => evalLessThan(i, machine)
+        case i@EqualsInstruction(pm)          => evalEquals(i, machine)
+        case i@SetRelativeBaseInstruction(pm) => evalSetRelativeBase(i, machine)
+        case i@HaltInstruction(pm)            => evalHALT(i, machine)
       }
     }
   }
 
-  def parseInstruction(ip: Int, memory: Vector[Int]): Instruction = {
+  def parseInstruction(ip: Long, memory: Memory): Instruction = {
     (memory(ip) /% 100) match {
       case (modes, ADD)        => AddInstruction(parseModes(modes, 3))
       case (modes, MULT)       => MultInstruction(parseModes(modes, 3))
@@ -93,16 +99,18 @@ object IntMachine {
       case (modes, JMP_FALSE)  => JumpFalseInstruction(parseModes(modes, 2))
       case (modes, LT)         => LessThanInstruction(parseModes(modes, 3))
       case (modes, EQ)         => EqualsInstruction(parseModes(modes, 3))
+      case (modes, SET_RB)     => SetRelativeBaseInstruction(parseModes(modes, 1))
       case (modes, HALT)       => HaltInstruction(parseModes(modes, 0))
       case _                   => throw new Exception("Invalid instruction")
     }
   }
 
-  def parseModes(modes: Int, length: Int): Vector[ParameterMode] = {
+  def parseModes(modes: Long, length: Int): Vector[ParameterMode] = {
     def parseMode(m: Char): ParameterMode =
       m match {
         case '0' => PositionMode
         case '1' => ImmediateMode
+        case '2' => RelativeMode
       }
 
     modes.toString
@@ -112,30 +120,37 @@ object IntMachine {
       .toVector
   }
 
-  def readParam(value: Int, mode: ParameterMode, memory: Vector[Int]): Int =
-    mode match {
-      case PositionMode  => memory(value)
-      case ImmediateMode => value
+  def readParam(machine: Machine, offset: Int, modes: Vector[ParameterMode]): Long =
+    machine match { case Machine(ip, _, m, rb, _, _) =>
+      modes(offset-1) match {
+        case PositionMode  => m(m(ip + offset))
+        case ImmediateMode => m(ip + offset)
+        case RelativeMode  => m(rb + m(ip+offset))
+      }
     }
 
-  def readParam(base: Int, i: Int, modes: Vector[ParameterMode], memory: Vector[Int]): Int =
-    modes(i-1) match {
-      case PositionMode => memory(memory(base+i))
-      case ImmediateMode => memory(base+i)
+  def getParamAddr(machine: Machine, offset: Int, modes: Vector[ParameterMode]): Long =
+    machine match { case (Machine(ip, _, m, rb, _, _)) =>
+      modes(offset-1) match {
+        case PositionMode  => m(ip + offset)
+        case ImmediateMode => throw new Exception("Invalid memory access")
+        case RelativeMode  => rb + m(ip+offset)
+      }
     }
 
   def evalADD(i: Instruction, m: Machine): Machine = {
-    val a = readParam(m.ip, 1, i.modes, m.memory)
-    val b = readParam(m.ip, 2, i.modes, m.memory)
-    val dest = m.memory(m.ip+3) // Don't dereference pointer
+    val a = readParam(m, 1, i.modes)
+    val b = readParam(m, 2, i.modes)
+    val dest = getParamAddr(m, 3, i.modes) // Don't dereference pointer
+    // val dest = m.memory(m.ip+3) // Don't dereference pointer
 
     m.copy(memory = m.memory.updated(dest, a+b), ip=m.ip+4)
   }
 
   def evalMULT(i: Instruction, m: Machine): Machine = {
-    val a = readParam(m.memory(m.ip+1), i.modes(0), m.memory)
-    val b = readParam(m.memory(m.ip+2), i.modes(1), m.memory)
-    val dest = m.memory(m.ip+3) // Don't dereference pointer
+    val a = readParam(m, 1, i.modes)
+    val b = readParam(m, 2, i.modes)
+    val dest = getParamAddr(m, 3, i.modes) // Don't dereference pointer
 
     m.copy(memory = m.memory.updated(dest, a*b), ip=m.ip+4)
   }
@@ -145,71 +160,75 @@ object IntMachine {
       case Nil    =>
         m.copy(state=Waiting)
       case h :: t =>
-        val dest = m.memory(m.ip+1)  // Don't dereference pointer
+        val dest = getParamAddr(m, 1, i.modes)  // Don't dereference pointer
         m.copy(memory=m.memory.updated(dest, h), input=t, ip=m.ip+2)
     }
-    // val in = m.input.head
-    // val dest = m.memory(m.ip+1)  // Don't dereference pointer
-
-    // m.copy(memory=m.memory.updated(dest, in), input=m.input.tail, ip=m.ip+2)
   }
 
   def evalOUT(i: Instruction, m: Machine): Machine = {
-    val out = readParam(m.memory(m.ip+1), i.modes(0), m.memory)
+    val out = readParam(m, 1, i.modes)
 
     m.copy(output = out +: m.output, ip=m.ip+2)
   }
 
   def evalJumpTrue(i: Instruction, m: Machine): Machine = {
-    val test = readParam(m.ip, 1, i.modes, m.memory)
-    val addr = readParam(m.ip, 2, i.modes, m.memory)
+    val test = readParam(m, 1, i.modes)
+    val addr = readParam(m, 2, i.modes)
 
     if(test != 0) m.copy(ip=addr)
     else         m.copy(ip=m.ip+3)
   }
 
   def evalJumpFalse(i: Instruction, m: Machine): Machine = {
-    val test = readParam(m.memory(m.ip+1), i.modes(0), m.memory)
-    val addr = readParam(m.memory(m.ip+2), i.modes(1), m.memory)
+    val test = readParam(m, 1, i.modes)
+    val addr = readParam(m, 2, i.modes)
 
     if(test == 0) m.copy(ip=addr)
     else         m.copy(ip=m.ip+3)
   }
 
   def evalLessThan(i: Instruction, m: Machine): Machine = {
-    val a = readParam(m.memory(m.ip+1), i.modes(0), m.memory)
-    val b = readParam(m.memory(m.ip+2), i.modes(1), m.memory)
-    val dest = m.memory(m.ip+3) // Don't dereference pointer
+    val a = readParam(m, 1, i.modes)
+    val b = readParam(m, 2, i.modes)
+    val dest = getParamAddr(m, 3, i.modes)
 
     if(a < b) m.copy(memory = m.memory.updated(dest, 1), ip=m.ip+4)
     else      m.copy(memory = m.memory.updated(dest, 0), ip=m.ip+4)
   }
 
   def evalEquals(i: Instruction, m: Machine): Machine = {
-    val a = readParam(m.memory(m.ip+1), i.modes(0), m.memory)
-    val b = readParam(m.memory(m.ip+2), i.modes(1), m.memory)
-    val dest = m.memory(m.ip+3) // Don't dereference pointer
+    val a = readParam(m, 1, i.modes)
+    val b = readParam(m, 2, i.modes)
+    val dest = getParamAddr(m, 3, i.modes)
 
     if(a == b) m.copy(memory = m.memory.updated(dest, 1), ip=m.ip+4)
     else      m.copy(memory = m.memory.updated(dest, 0), ip=m.ip+4)
+  }
+
+  def evalSetRelativeBase(i: Instruction, m: Machine): Machine = {
+    val rb = readParam(m, 1, i.modes)
+    m.copy(relativeBase = m.relativeBase+rb, ip=m.ip+2)
   }
 
   def evalHALT(i: Instruction, m: Machine): Machine = {
     m.copy(state = Halted)
   }
 
-  def readMemory(f: String): Vector[Int] =
+  def readMemory(f: String): Memory =
     io.Source.fromFile(f)
       .getLines().flatten
       .mkString
       .split(",")
-      .toVector
-      .map(_.toInt)
+      .zipWithIndex
+      .map { case (s, i) => (i.toLong, s.toLong) }  // Swap the index and value and convert both to Long
+      .toMap
+      .withDefaultValue(0)
 
-  def parseMemory(s: String): Vector[Int] =
+  def parseMemory(s: String): Memory =
     s.split(",")
-      .toVector
-      .map(_.toInt)
-
+      .zipWithIndex
+      .map { case (s, i) => (i.toLong, s.toLong) }  // Swap the index and value and convert both to Long
+      .toMap
+      .withDefaultValue(0)
 
 }

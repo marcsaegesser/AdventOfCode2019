@@ -9,40 +9,40 @@ object Day07 {
     println(s"Day07.part2 = ${part2(memory)}")
   }
 
-  def part1(memory: Vector[Int]): Int = {
-    (0 to 4).permutations.foldLeft(Int.MinValue) { case (o, ps) =>
+  def part1(memory: Memory): Long = {
+    (0L to 4L).permutations.foldLeft(Long.MinValue) { case (o, ps) =>
       Math.max(o, runAmplifiers(ps, memory))
     }
   }
 
-  def part2(memory: Vector[Int]): Int = {
-    (5 to 9).permutations.foldLeft(Int.MinValue) { case (o, ps) =>
+  def part2(memory: Memory): Long = {
+    (5L to 9L).permutations.foldLeft(Long.MinValue) { case (o, ps) =>
       Math.max(o, runMachines(ps, memory).head)
     }
   }
 
   //========================
   // For part 1
-  def runAmplifiers(phases: Seq[Int], memory: Vector[Int]): Int = {
-    phases.foldLeft(0) { case (i, p) =>
+  def runAmplifiers(phases: Seq[Long], memory: Memory): Long = {
+    phases.foldLeft(0L) { case (i, p) =>
       runAmplifier(i, p, memory)
     }
   }
 
-  def runAmplifier(input: Int, phase: Int, memory: Vector[Int]): Int = {
+  def runAmplifier(input: Long, phase: Long, memory: Memory): Long = {
     runMachine(initializeMachine(memory, List(phase, input))).output.head
   }
 
   //========================
   // For part 2
-  def startMachines(phases: Seq[Int], memory: Vector[Int]): (List[Int], Vector[Machine]) =
-    phases.foldLeft((List(0), Vector.empty[Machine])) { case ((i, ms), p) =>
+  def startMachines(phases: Seq[Long], memory: Memory): (List[Long], Vector[Machine]) =
+    phases.foldLeft((List(0L), Vector.empty[Machine])) { case ((i, ms), p) =>
       val (o, next) = takeOutput(runMachine(initializeMachine(memory, p +: i)))
       (o, ms :+ next)
     }
 
-  def runMachines(phases: Seq[Int], memory: Vector[Int]): List[Int] = {
-    def helper(f: List[Int], ms: Vector[Machine]): List[Int] =
+  def runMachines(phases: Seq[Long], memory: Memory): List[Long] = {
+    def helper(f: List[Long], ms: Vector[Machine]): List[Long] =
       if(ms.last.state == Halted) f
       else {
         val (o, next) = runIteration(f, ms)
@@ -54,13 +54,13 @@ object Day07 {
     helper(f, ms)
   }
 
-  def runIteration(feedback: List[Int], machines: Vector[Machine]): (List[Int], Vector[Machine]) =
+  def runIteration(feedback: List[Long], machines: Vector[Machine]): (List[Long], Vector[Machine]) =
     machines.foldLeft((feedback, Vector.empty[Machine])) { case ((i, ms), m) =>
       val (o, next) = takeOutput(runAmplifier(i, m))
       (o, ms :+ next)
     }
 
-  def runAmplifier(input: List[Int], machine: Machine): Machine =
+  def runAmplifier(input: List[Long], machine: Machine): Machine =
     runMachine(provideInput(machine, input))
 
   val inputFile = "data/Day07.txt"
