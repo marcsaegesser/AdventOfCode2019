@@ -72,6 +72,9 @@ object IntMachine {
   def takeOutput(m: Machine): (List[Long], Machine) =
     (m.output.reverse, m.copy(output = List.empty[Long]))
 
+  def setMemory(m: Machine, addr: Long, value: Long): Machine =
+    m.copy(memory = m.memory.updated(addr, value))
+
   def step(machine: Machine): Machine = {
     machine match { case Machine(ip, state, m, b, i, o) if state == Running =>
       parseInstruction(ip, m) match {
