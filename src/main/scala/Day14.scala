@@ -4,63 +4,59 @@ import scala.math.Integral.Implicits._
 
 object Day14 {
 
-  def simplify(reactions: Reactions) = {
-    def helper(rs: List[Reagent], avail: Map[String, Int]): Map[String, Int] =
-      rs match {
-        case Nil    => avail
-        case Reagent(name, amount) :: t =>
-          reactions.find { case (r, rs) => r.name == name } match {
-            case None => helper(t, updateAvailable(avail, name, amount)) // No more simpflications
-            case Some((r, rs)) =>
-              val wholeAmount = computeWholeAmount(amount, r.amount)
-              val factor = wholeAmount / r.amount
-              val extra = wholeAmount - r.amount
-              val newReagents = rs.map(reagent => reagent.copy(amount = reagent.amount * factor))
-              helper(newReagents ++ t, updateAvailable(avail, r.name, extra))
+    def helper(rs: List[Reagent], reactions: Reactions): List[Reagent] = {
+      val expand =
+        rs.flatMap { r =>
+          reactions.find { case (rhs, lhs) => rhs.name == r.name } match {
+            case None             => List(r)
+            case Some((rhs, lhs)) =>
+              val factor = computeWholeFactor(r.amount, rhs.amount)
+              lhs.map(l => l.copy(amount = l.amount*factor))
           }
-      }
+        }
+      val group = expand.groupBy(_.name)
+      val next =
+        group.map { case (n, rs) =>
+          (n, Reagent(n, rs.map(_.amount).sum))
+        }.values.toList
 
-    helper(List(Reagent("FUEL", 1)), Map.empty[String, Int])
-  }
-
-  def updateAvailable(avail: Map[String , Int], name: String, amount: Int): Map[String, Int] =
-    avail.updated(name, avail.getOrElse(name, 0) + amount)
-
-  def computeWholeAmount(n: Int, d: Int): Int =
-    (n /% d) match {
-      case (q, 0) => n
-      case (q, r) => n + d - r
+      next
     }
 
-  // def computeWholeAmount(name: String, need: Int, reactions: Reactions): List[Reagent] = {
-  //   reactions.find { case (r, rs) => r.name == name } match {
-  //     case None => List()
-  //     case Some((r, rs)) => rs.map { case Reagent(n, a) => Reagent() }
-  //   }
-  // }
+  def simplify(allReactions: Reactions) = {
+    def helper(rs: List[Reagent], reactions: Reactions): List[Reagent] = {
+      val expand =
+        rs.flatMap { r =>
+          reactions.find { case (rhs, lhs) => rhs.name == r.name } match {
+            case None             => List(r)
+            case Some((rhs, lhs)) =>
+              val factor = computeWholeFactor(r.amount, rhs.amount)
+              lhs.map(l => l.copy(amount = l.amount*factor))
+          }
+        }
+      val group = expand.groupBy(_.name)
+      val next =
+        group.map { case (n, rs) =>
+          (n, Reagent(n, rs.map(_.amount).sum))
+        }.values.toList
 
-  // def wholeAmount(need: Int, numerator: Int, denominator: Int): Int =
-  //   (need*numerator) /% denominator match {
-  //     case (q, 0) => q
-  //     case (q, _) => ???
-  //   }
+      if(next != rs) helper(next, reactions)
+      else          next
+    }
 
-  // def computeWholeAmount(reactions: Reactions, name: String, need: Int): Int = {
-  //   val Rational(n, d) = oreReactions(name).head.amount.scale(need)
+    val otherReactions = allReactions.filterNot { case (k, v) => v.exists(_.name == "ORE") }
+    val oreReactions = allReactions -- otherReactions.keys
 
-  //   n /% d match {
-  //     case (q, 0) => q
-  //     case (q, _) => q + d
-  //   }
-  // }
+    val nonOre = helper(List(Reagent("FUEL", 1)), otherReactions)
 
+    helper(nonOre, oreReactions)
+  }
 
-  // def simplifyReagent(reagent: Reagent, reactions: Reactions): List[Reagent] = {
-  //   reactions.get(reagent.name) match {
-  //     case None     => List(reagent)
-  //     case Some(rs) => rs.flatMap(r => simplifyReagent(r, reactions)).map(r => scaleReagent(r, reagent.amount))
-  //   }
-  // }
+  def computeWholeFactor(n: Int, d: Int): Int =
+    (n /% d) match {
+      case (q, 0) => q
+      case (q, r) => q + 1
+    }
 
   case class Reagent(name: String, amount: Int)
 
@@ -105,6 +101,37 @@ object Day14 {
                     |7 DCFZ, 7 PSHF => 2 XJWVT
                     |165 ORE => 2 GPVTF
                     |3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT""".stripMargin
+
+  val testData3 = """2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
+                    |17 NVRVD, 3 JNWZP => 8 VPVL
+                    |53 STKFG, 6 MNCFX, 46 VJHF, 81 HVMC, 68 CXFTF, 25 GNMV => 1 FUEL
+                    |22 VJHF, 37 MNCFX => 5 FWMGM
+                    |139 ORE => 4 NVRVD
+                    |144 ORE => 7 JNWZP
+                    |5 MNCFX, 7 RFSQX, 2 FWMGM, 2 VPVL, 19 CXFTF => 3 HVMC
+                    |5 VJHF, 7 MNCFX, 9 VPVL, 37 CXFTF => 6 GNMV
+                    |145 ORE => 6 MNCFX
+                    |1 NVRVD => 8 CXFTF
+                    |1 VJHF, 6 MNCFX => 4 RFSQX
+                    |176 ORE => 6 VJHF""".stripMargin
+
+  val testData4 = """171 ORE => 8 CNZTR
+                    |7 ZLQW, 3 BMBT, 9 XCVML, 26 XMNCP, 1 WPTQ, 2 MZWV, 1 RJRHP => 4 PLWSL
+                    |114 ORE => 4 BHXH
+                    |14 VRPVC => 6 BMBT
+                    |6 BHXH, 18 KTJDG, 12 WPTQ, 7 PLWSL, 31 FHTLT, 37 ZDVW => 1 FUEL
+                    |6 WPTQ, 2 BMBT, 8 ZLQW, 18 KTJDG, 1 XMNCP, 6 MZWV, 1 RJRHP => 6 FHTLT
+                    |15 XDBXC, 2 LTCX, 1 VRPVC => 6 ZLQW
+                    |13 WPTQ, 10 LTCX, 3 RJRHP, 14 XMNCP, 2 MZWV, 1 ZLQW => 1 ZDVW
+                    |5 BMBT => 4 WPTQ
+                    |189 ORE => 9 KTJDG
+                    |1 MZWV, 17 XDBXC, 3 XCVML => 2 XMNCP
+                    |12 VRPVC, 27 CNZTR => 2 XDBXC
+                    |15 KTJDG, 12 BHXH => 5 XCVML
+                    |3 BHXH, 2 VRPVC => 7 MZWV
+                    |121 ORE => 7 VRPVC
+                    |7 XCVML => 6 RJRHP
+                    |5 BHXH, 4 VRPVC => 5 LTCX""".stripMargin
 }
 
 object Day14X {
@@ -235,4 +262,35 @@ object Day14X {
                     |7 DCFZ, 7 PSHF => 2 XJWVT
                     |165 ORE => 2 GPVTF
                     |3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT""".stripMargin
+
+  val testData3 = """2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
+                    |17 NVRVD, 3 JNWZP => 8 VPVL
+                    |53 STKFG, 6 MNCFX, 46 VJHF, 81 HVMC, 68 CXFTF, 25 GNMV => 1 FUEL
+                    |22 VJHF, 37 MNCFX => 5 FWMGM
+                    |139 ORE => 4 NVRVD
+                    |144 ORE => 7 JNWZP
+                    |5 MNCFX, 7 RFSQX, 2 FWMGM, 2 VPVL, 19 CXFTF => 3 HVMC
+                    |5 VJHF, 7 MNCFX, 9 VPVL, 37 CXFTF => 6 GNMV
+                    |145 ORE => 6 MNCFX
+                    |1 NVRVD => 8 CXFTF
+                    |1 VJHF, 6 MNCFX => 4 RFSQX
+                    |176 ORE => 6 VJHF""".stripMargin
+
+  val testData4 = """171 ORE => 8 CNZTR
+                    |7 ZLQW, 3 BMBT, 9 XCVML, 26 XMNCP, 1 WPTQ, 2 MZWV, 1 RJRHP => 4 PLWSL
+                    |114 ORE => 4 BHXH
+                    |14 VRPVC => 6 BMBT
+                    |6 BHXH, 18 KTJDG, 12 WPTQ, 7 PLWSL, 31 FHTLT, 37 ZDVW => 1 FUEL
+                    |6 WPTQ, 2 BMBT, 8 ZLQW, 18 KTJDG, 1 XMNCP, 6 MZWV, 1 RJRHP => 6 FHTLT
+                    |15 XDBXC, 2 LTCX, 1 VRPVC => 6 ZLQW
+                    |13 WPTQ, 10 LTCX, 3 RJRHP, 14 XMNCP, 2 MZWV, 1 ZLQW => 1 ZDVW
+                    |5 BMBT => 4 WPTQ
+                    |189 ORE => 9 KTJDG
+                    |1 MZWV, 17 XDBXC, 3 XCVML => 2 XMNCP
+                    |12 VRPVC, 27 CNZTR => 2 XDBXC
+                    |15 KTJDG, 12 BHXH => 5 XCVML
+                    |3 BHXH, 2 VRPVC => 7 MZWV
+                    |121 ORE => 7 VRPVC
+                    |7 XCVML => 6 RJRHP
+                    |5 BHXH, 4 VRPVC => 5 LTCX""".stripMargin
 }
