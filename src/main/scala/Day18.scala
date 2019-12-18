@@ -23,9 +23,22 @@ object Day18 {
     def right = Coord(x+1, y)
   }
 
+  def findAll(state: VaultState) = {
+    def helper(found: List[VaultState]): List[VaultState] = {
+      found.flatMap(reachableKeys) match {
+        case Nil => found
+        case l   => helper(l)
+      }
+
+    }
+
+    helper(List(state))
+  }
+
   def reachableKeys(state: VaultState): List[VaultState] = {
     def helper(found: List[VaultState], depth: Int, visited: Set[Coord], active: Set[Coord]): List[VaultState] = {
-      if(active.isEmpty) found
+      if(active.isEmpty)             found
+      else if(!keyExists(state.map)) found
       else {
         val (f, n) = active.partition(c => isKey(state.map, c))
         val nextFound = f.map(c => takeKey(c, depth, state)).toList ++ found
@@ -42,6 +55,12 @@ object Day18 {
     Set(pos.up, pos.down, pos.left, pos.right).map(c => (c, map.get(c))).collect {
       case (c, None)         => c
       case (c, Some(Key(_))) => c
+    }
+
+  def keyExists(map: VaultMap): Boolean =
+    map.exists {
+      case (k, Key(_)) => true
+      case (k, _)      => false
     }
 
   def isKey(map: VaultMap, pos: Coord): Boolean =
@@ -132,5 +151,22 @@ object Day18 {
                     |#f.D.E.e.C.b.A.@.a.B.c.#
                     |######################.#
                     |#d.....................#
+                    |########################""".stripMargin.linesIterator
+
+  val testData2 = """#################
+                    |#i.G..c...e..H.p#
+                    |########.########
+                    |#j.A..b...f..D.o#
+                    |########@########
+                    |#k.E..a...g..B.n#
+                    |########.########
+                    |#l.F..d...h..C.m#
+                    |#################""".stripMargin.linesIterator
+
+  val testData3 = """########################
+                    |#@..............ac.GI.b#
+                    |###d#e#f################
+                    |###A#B#C################
+                    |###g#h#i################
                     |########################""".stripMargin.linesIterator
 }
