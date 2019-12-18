@@ -23,13 +23,58 @@ object Day18 {
     def right = Coord(x+1, y)
   }
 
+  def reachableKeys(state: VaultState): List[VaultState] = {
+    def helper(found: List[VaultState], depth: Int, visited: Set[Coord], active: Set[Coord]): List[VaultState] = {
+      if(active.isEmpty) found
+      else {
+        val (f, n) = active.partition(c => isKey(state.map, c))
+        val nextFound = f.map(c => takeKey(c, depth, state)).toList ++ found
+        val nextCoords = n.flatMap(c => reachablePositions(state.map, c)) -- visited
+
+        helper(nextFound, depth+1, visited ++ f ++ n, nextCoords)
+      }
+    }
+
+    helper(List(), 0, Set(), Set(state.pos))
+  }
+
+  def reachablePositions(map: VaultMap, pos: Coord): Set[Coord] =
+    Set(pos.up, pos.down, pos.left, pos.right).map(c => (c, map.get(c))).collect {
+      case (c, None)         => c
+      case (c, Some(Key(_))) => c
+    }
+
+  def isKey(map: VaultMap, pos: Coord): Boolean =
+    map.get(pos) match {
+      case Some(Key(_)) => true
+      case _              => false
+    }
+
+  def takeKey(pos: Coord, steps: Int, state: VaultState): VaultState = {
+    val map =
+      state.map.get(pos) match {
+        case Some(Key(n)) => updateMap(updateMap(removeDoor(state.map, n.toUpper), pos, Player), state.pos, Empty)
+        case _            => throw new Exception("Invalid state")
+      }
+
+    VaultState(pos, state.steps + steps, map)
+  }
+
+  def removeDoor(map: VaultMap, name: Char): VaultMap =
+    map.find { case (c, o) => o == Door(name) } match {
+      case None         => map
+      case Some((c, _)) => updateMap(map, c, Empty)
+    }
 
   def updateMap(map: VaultMap, pos: Coord, value: VaultObject): VaultMap =
     if(value == Empty) map - pos
     else              map.updated(pos, value)
 
   def initialState(map: VaultMap): VaultState = {
-    val (player, _) = map.find { case (p, v) => v == Player }.get
+    val (player, _) = map.find {
+      case (p, Player) => true
+      case (p, _)      => false
+    }.get
     VaultState(player, 0, map)
   }
 
