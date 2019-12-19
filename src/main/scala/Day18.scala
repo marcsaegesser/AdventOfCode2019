@@ -23,16 +23,32 @@ object Day18 {
     def right = Coord(x+1, y)
   }
 
-  def findAll(state: VaultState) = {
-    def helper(found: List[VaultState]): List[VaultState] = {
-      found.flatMap(reachableKeys) match {
-        case Nil => found
-        case l   => helper(l)
-      }
+  def findMin(state: VaultState) = {
+    def helper(found: Option[VaultState], active: List[VaultState]): Option[VaultState] = {
+      val maxSteps = found.map(_.steps).getOrElse(Int.MaxValue)
 
+      active match {
+        case Nil    => found
+        case h :: t if h.steps < maxSteps =>
+          // First search the tree based on h
+          val first =
+            reachableKeys(h) match {
+              case Nil => if(h.steps < maxSteps) Some(h) else found // No more keys, h is a solution
+              case l    => helper(found, l)                         // Descend on h's chidren
+            }
+          val rest = helper(first, t)
+          (first, rest) match {
+            case (None, None) => None
+            case (Some(a), None) => first
+            case (None, Some(b)) => rest
+            case (Some(a), Some(b)) if a.steps < b.steps => first
+            case _                                       => rest
+          }
+        case h :: t => helper(found, t)   // Head is already too many steps
+      }
     }
 
-    helper(List(state))
+    helper(None, List(state))
   }
 
   def reachableKeys(state: VaultState): List[VaultState] = {
