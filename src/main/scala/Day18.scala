@@ -27,7 +27,7 @@ object Day18 {
     def helper(found: Option[VaultState], active: List[VaultState]): Option[VaultState] = {
       val maxSteps = found.map(_.steps).getOrElse(Int.MaxValue)
 
-      active match {
+      active.sortBy(_.steps) match {
         case Nil    => found
         case h :: t if h.steps < maxSteps =>
           // First search the tree based on h
@@ -167,7 +167,7 @@ object Day18 {
                     |#f.D.E.e.C.b.A.@.a.B.c.#
                     |######################.#
                     |#d.....................#
-                    |########################""".stripMargin.linesIterator
+                    |########################""".stripMargin
 
   val testData2 = """#################
                     |#i.G..c...e..H.p#
@@ -177,12 +177,12 @@ object Day18 {
                     |#k.E..a...g..B.n#
                     |########.########
                     |#l.F..d...h..C.m#
-                    |#################""".stripMargin.linesIterator
+                    |#################""".stripMargin
 
   val testData3 = """########################
                     |#@..............ac.GI.b#
                     |###d#e#f################
                     |###A#B#C################
                     |###g#h#i################
-                    |########################""".stripMargin.linesIterator
+                    |########################""".stripMargin
 }
